@@ -2,7 +2,7 @@
 # Created by: Addisu Taye
 # Purpose: Clean raw transaction data (handle missing values, type conversion, filtering).
 # Key features:
-# - Load raw Excel file
+# - Load raw CSV file
 # - Convert timestamps to datetime
 # - Handle missing values
 # - Filter relevant columns
@@ -17,7 +17,7 @@ def clean_data(input_path="data/raw/raw_data.csv", output_dir="data/processed"):
     Clean raw transaction data and save cleaned version
     """
     print("Loading raw data...")
-    df = pd.read_excel(input_path)
+    df = pd.read_csv(input_path)
 
     # Filter out unnecessary columns
     cols_to_keep = [
@@ -54,6 +54,7 @@ def clean_data(input_path="data/raw/raw_data.csv", output_dir="data/processed"):
     print(f"Missing value report saved to {missing_report_path}")
 
     return df
+
 
 if __name__ == "__main__":
     df_cleaned = clean_data()
