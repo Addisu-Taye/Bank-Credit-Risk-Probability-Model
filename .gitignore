@@ -1,0 +1,29 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+ENV
+
+# Data
+data/raw/
+data/processed/
+
+# MLflow
+mlruns/
+mlflow-artifacts/
+
+# Logs
+logs/
+*.log
+
+# Jupyter
+notebooks/.ipynb_checkpoints
+
+# Environment
+.env
+.DS_Store
+Thumbs.db
