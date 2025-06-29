@@ -1,16 +1,6 @@
-# Date: 2025-04-05
-# Created by: Addisu Taye
-# Purpose: Expose a REST API for real-time credit risk prediction using FastAPI.
-# Key features:
-# - Loads trained model and preprocessor
-# - Accepts POST requests with customer transaction history
-# - Preprocesses and transforms data into model-ready format
-# - Returns risk probability and classification
-# - Uses Pydantic models for input/output validation
-# Task Number: 6
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 import os
 import pickle
@@ -22,11 +12,14 @@ from datetime import datetime
 
 # Import local modules
 import sys
-sys.path.append("..")  # Add parent directory to path
+from pathlib import Path
 
-from src.predict import RiskPredictor
-from src.feature_engineering import FeatureEngineering
-from src.data_processing import DataProcessing
+# Add src directory to path
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
+from predict import RiskPredictor
+from feature_engineering import FeatureEngineering
+from data_processing import DataProcessing
 
 # Initialize app
 app = FastAPI(title="Credit Risk API")
@@ -42,6 +35,24 @@ app.add_middleware(
 
 # Initialize predictor
 predictor = RiskPredictor()
+
+# Define Pydantic models
+class Transaction(BaseModel):
+    Amount: float
+    Value: float
+    CountryCode: int
+    ProviderId: int
+    PricingStrategy: int
+    ProductCategory: int
+    ChannelId: int
+    TransactionStartTime: str
+
+class CustomerRiskRequest(BaseModel):
+    transactions: List[Transaction]
+
+class RiskPredictionResponse(BaseModel):
+    risk_probability: float
+    is_high_risk: bool
 
 @app.get("/")
 def read_root():
@@ -82,6 +93,9 @@ def predict_credit_risk(customer_data: CustomerRiskRequest):
         # Get the most recent transaction details
         latest_transaction = df.loc[df['TransactionStartTime'].idxmax()]
         
+        # Fill NaN values with 0 for std calculation
+        df['Amount'] = df['Amount'].fillna(0)
+        
         # Create a single row with combined features
         input_data = pd.DataFrame({
             'Amount': [latest_transaction['Amount']],
@@ -96,13 +110,13 @@ def predict_credit_risk(customer_data: CustomerRiskRequest):
             'transaction_month': [latest_transaction['transaction_month']],
             'total_transactions': [len(df)],
             'avg_transaction_amount': [df['Amount'].mean()],
-            'std_transaction_amount': [df['Amount'].std()],
+            'std_transaction_amount': [df['Amount'].std() if len(df) > 1 else 0],
             'total_transaction_value': [df['Value'].sum()],
             'unique_product_categories': [df['ProductCategory'].nunique()],
-            'recency': [rfm_df['recency'].values[0]],
-            'frequency': [rfm_df['frequency'].values[0]],
-            'monetary': [rfm_df['monetary'].values[0]]
-        })
+            'recency': [rfm_df['recency'].values[0] if len(rfm_df) > 0 else 0],
+            'frequency': [rfm_df['frequency'].values[0] if len(rfm_df) > 0 else 0],
+            'monetary': [rfm_df['monetary'].values[0] if len(rfm_df) > 0 else 0]
+        }).fillna(0)  # Fill any remaining NaN values
         
         # Make prediction
         risk_probability = predictor.predict_risk_probability(input_data)[0]
