@@ -6,6 +6,8 @@
 # - Identifies the high-risk cluster based on behavioral patterns
 # - Merges high-risk labels back into original dataset
 # - Prepares feature matrix and target vector for model training
+# - Saves key outputs to CSV files in a 'reports/' directory.
+# - Generates and saves plots related to RFM distributions and customer clusters in a 'plots/' directory.
 # Task Number: 4
 
 
@@ -14,6 +16,9 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
+import os # Import the os module for directory operations
+import matplotlib.pyplot as plt # Import matplotlib for plotting
+import seaborn as sns # Import seaborn for enhanced plots
 
 
 class DataProcessing:
@@ -183,10 +188,125 @@ class DataProcessing:
         print(f"Features (X) shape: {X.shape}, Target (y) shape: {y.shape}")
         return X, y
 
+    def save_to_csv(self, df, filename, output_dir='reports/'):
+        """
+        Saves a DataFrame or Series to a CSV file.
+
+        Args:
+            df (pd.DataFrame or pd.Series): The DataFrame or Series to save.
+            filename (str): The name of the CSV file (e.g., 'features.csv').
+            output_dir (str): The directory to save the CSV file. Defaults to 'reports/'.
+        """
+        os.makedirs(output_dir, exist_ok=True) # Create directory if it doesn't exist
+        filepath = os.path.join(output_dir, filename)
+        if isinstance(df, pd.Series):
+            df.name = df.name if df.name else 'value' # Ensure series has a name for CSV header
+            df.to_csv(filepath, index=False, header=True)
+        else:
+            df.to_csv(filepath, index=False)
+        print(f"Saved {filename} to {filepath}")
+
+    def save_plot(self, fig, filename, output_dir='plots/'):
+        """
+        Saves a matplotlib figure to a file.
+
+        Args:
+            fig (matplotlib.figure.Figure): The figure object to save.
+            filename (str): The name of the plot file (e.g., 'rfm_distributions.png').
+            output_dir (str): The directory to save the plot. Defaults to 'plots/'.
+        """
+        os.makedirs(output_dir, exist_ok=True) # Create directory if it doesn't exist
+        filepath = os.path.join(output_dir, filename)
+        fig.savefig(filepath, bbox_inches='tight') # bbox_inches='tight' prevents labels/titles from being cut off
+        plt.close(fig) # Close the figure to free up memory
+        print(f"Saved plot {filename} to {filepath}")
+
+    def plot_rfm_distributions(self, rfm_df, output_dir='plots/'):
+        """
+        Plots the distributions of Recency, Frequency, and Monetary values.
+
+        Args:
+            rfm_df (pd.DataFrame): DataFrame containing 'recency', 'frequency', 'monetary'.
+            output_dir (str): Directory to save the plots.
+        """
+        print("Generating RFM distribution plots...")
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5)) # Create a figure with 3 subplots
+
+        sns.histplot(rfm_df['recency'], kde=True, ax=axes[0], color='skyblue')
+        axes[0].set_title('Recency Distribution')
+        axes[0].set_xlabel('Recency (Days)')
+        axes[0].set_ylabel('Number of Customers')
+
+        sns.histplot(rfm_df['frequency'], kde=True, ax=axes[1], color='lightcoral')
+        axes[1].set_title('Frequency Distribution')
+        axes[1].set_xlabel('Frequency (Transactions)')
+        axes[1].set_ylabel('Number of Customers')
+
+        sns.histplot(rfm_df['monetary'], kde=True, ax=axes[2], color='lightgreen')
+        axes[2].set_title('Monetary Distribution')
+        axes[2].set_xlabel('Monetary (Total Spend)')
+        axes[2].set_ylabel('Number of Customers')
+
+        plt.tight_layout() # Adjust subplot parameters for a tight layout
+        self.save_plot(fig, 'rfm_distributions.png', output_dir)
+        print("RFM distribution plots generated.")
+
+    def plot_cluster_scatter(self, rfm_df, high_risk_cluster, output_dir='plots/'):
+        """
+        Plots scatter plots of RFM features, colored by cluster,
+        highlighting the high-risk cluster.
+
+        Args:
+            rfm_df (pd.DataFrame): DataFrame with 'recency', 'frequency', 'monetary', 'cluster', 'is_high_risk'.
+            high_risk_cluster (int): The label of the identified high-risk cluster.
+            output_dir (str): Directory to save the plots.
+        """
+        print("Generating cluster scatter plots...")
+
+        # Plot 1: Recency vs Frequency
+        fig1, ax1 = plt.subplots(figsize=(8, 6))
+        sns.scatterplot(x='recency', y='frequency', hue='cluster', data=rfm_df,
+                        palette='viridis', ax=ax1, s=50, alpha=0.7)
+        # Highlight high-risk customers with a distinct marker and color
+        sns.scatterplot(x='recency', y='frequency', data=rfm_df[rfm_df['is_high_risk'] == 1],
+                        color='red', marker='X', s=200, label='High-Risk', ax=ax1, zorder=5) # zorder to ensure it's on top
+        ax1.set_title('Customer Clusters: Recency vs Frequency')
+        ax1.set_xlabel('Recency (Days)')
+        ax1.set_ylabel('Frequency (Transactions)')
+        ax1.legend(title='Cluster')
+        self.save_plot(fig1, 'cluster_recency_frequency.png', output_dir)
+
+        # Plot 2: Recency vs Monetary
+        fig2, ax2 = plt.subplots(figsize=(8, 6))
+        sns.scatterplot(x='recency', y='monetary', hue='cluster', data=rfm_df,
+                        palette='viridis', ax=ax2, s=50, alpha=0.7)
+        sns.scatterplot(x='recency', y='monetary', data=rfm_df[rfm_df['is_high_risk'] == 1],
+                        color='red', marker='X', s=200, label='High-Risk', ax=ax2, zorder=5)
+        ax2.set_title('Customer Clusters: Recency vs Monetary')
+        ax2.set_xlabel('Recency (Days)')
+        ax2.set_ylabel('Monetary (Total Spend)')
+        ax2.legend(title='Cluster')
+        self.save_plot(fig2, 'cluster_recency_monetary.png', output_dir)
+
+        # Plot 3: Frequency vs Monetary
+        fig3, ax3 = plt.subplots(figsize=(8, 6))
+        sns.scatterplot(x='frequency', y='monetary', hue='cluster', data=rfm_df,
+                        palette='viridis', ax=ax3, s=50, alpha=0.7)
+        sns.scatterplot(x='frequency', y='monetary', data=rfm_df[rfm_df['is_high_risk'] == 1],
+                        color='red', marker='X', s=200, label='High-Risk', ax=ax3, zorder=5)
+        ax3.set_title('Customer Clusters: Frequency vs Monetary')
+        ax3.set_xlabel('Frequency (Transactions)')
+        ax3.set_ylabel('Monetary (Total Spend)')
+        ax3.legend(title='Cluster')
+        self.save_plot(fig3, 'cluster_frequency_monetary.png', output_dir)
+
+        print("Cluster scatter plots generated.")
+
     def process_pipeline(self, raw_data_df):
         """
         Full pipeline for data processing, including RFM calculation, clustering,
         and proxy target variable creation, aligned with Task 4.
+        Also saves key outputs to CSV files and plots.
 
         Args:
             raw_data_df (pd.DataFrame): The raw input DataFrame containing transaction data.
@@ -203,7 +323,6 @@ class DataProcessing:
         print("Starting full data processing pipeline for Task 4: Proxy Target Variable Engineering.")
 
         # Initialize feature engineering (assuming FeatureEngineering class is defined elsewhere)
-        # This part relies on an external FeatureEngineering class to prepare 'df' and 'rfm_df'.
         try:
             fe = FeatureEngineering()
         except NameError:
@@ -211,8 +330,11 @@ class DataProcessing:
             raise
 
         # Process data through feature engineering to get the main DataFrame and RFM DataFrame
-        # The 'raw_data_df' is passed directly as cleaning is not part of this task.
-        df, rfm_df = fe.process_data(raw_data_df.copy()) # Use .copy() to avoid modifying original df
+        df, rfm_df = fe.process_data(raw_data_df.copy())
+
+        # Plot RFM distributions before clustering
+        # Pass a copy of rfm_df to ensure the plotting function does not modify the original
+        self.plot_rfm_distributions(rfm_df.copy())
 
         # Identify high risk customers using K-Means clustering on RFM features
         rfm_df, cluster_analysis, high_risk_cluster, kmeans_model, scaler = self.identify_high_risk_customers(rfm_df)
@@ -221,11 +343,22 @@ class DataProcessing:
             print("Error: Failed to identify high-risk customers or 'is_high_risk' column is missing after clustering.")
             return None, None, None, None, None, None
 
+        # Plot customer clusters after high-risk identification
+        # Pass a copy of rfm_df to ensure the plotting function does not modify the original
+        self.plot_cluster_scatter(rfm_df.copy(), high_risk_cluster)
+
         # Merge the 'is_high_risk' indicator back into the original dataset
         processed_df = self.merge_with_original_data(df, rfm_df)
 
         # Prepare the final feature matrix (X) and target vector (y) for model training
         X, y = self.prepare_training_data(processed_df)
+
+        # Save outputs to CSV files
+        self.save_to_csv(X, 'features.csv')
+        self.save_to_csv(y, 'target_variable.csv')
+        self.save_to_csv(cluster_analysis, 'cluster_analysis.csv')
+        # Save the full processed_df which includes CustomerId, RFM, and is_high_risk
+        self.save_to_csv(processed_df, 'processed_customer_data.csv')
 
         print("Full data processing pipeline for Task 4 complete.")
         return X, y, cluster_analysis, high_risk_cluster, kmeans_model, scaler
